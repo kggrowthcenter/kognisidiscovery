@@ -18,31 +18,37 @@ df_sap, df_merged, df_combined_au_capture, df_creds = finalize_data()
 st.logo('kognisi_logo.png')
 
 
-# Sidebar filters
+# Sidebar filters with multiselect
+st.sidebar.header("Filter Options")
+
 platform_options = ['All'] + sorted(df_merged['platform'].unique().tolist())
-selected_platform = st.sidebar.selectbox('Select Platform', platform_options)
-
-unit_options = sorted(df_merged['unit'].unique().tolist())
-selected_unit = st.sidebar.multiselect('Select Unit', unit_options)
-
-layer_options = sorted(df_merged['layer'].astype(str).unique().tolist())
-#layer_options = sorted(df_merged['layer'].unique().tolist())
-selected_layer = st.sidebar.multiselect('Select Layer', layer_options)
-
-status_options = ['All'] + sorted(df_merged['status_learner'].unique().tolist())
-selected_status = st.sidebar.selectbox('Select Status Learner', status_options)
+selected_platform = st.sidebar.multiselect('Select Platform', platform_options)
 
 title_options = sorted(df_merged['title'].unique().tolist())
 selected_title = st.sidebar.multiselect('Select Title', title_options)
 
-company_options = sorted(df_merged['Company'].unique().tolist())
-selected_company = st.sidebar.multiselect('Select Company', company_options)
+status_options = ['All'] + sorted(df_merged['status_learner'].unique().tolist())
+selected_status = st.sidebar.multiselect('Select Internal/External', status_options)
+
+unit_options = sorted(df_merged['unit'].unique().tolist())
+selected_unit = st.sidebar.multiselect('Select Unit', unit_options)
+
+subunit_options = sorted(df_merged['subunit'].unique().tolist())
+selected_subunit = st.sidebar.multiselect('Select Subunit', subunit_options)
+
+layer_options = sorted(df_merged['layer'].astype(str).unique().tolist())
+selected_layer = st.sidebar.multiselect('Select Layer', layer_options)
+
+years_options = sorted(df_merged['tenure'].astype(str).unique().tolist())
+selected_years = st.sidebar.multiselect('Select Years (Tenure)', years_options)
 
 institution_options = sorted(df_merged['institution'].unique().tolist())
 selected_institution = st.sidebar.multiselect('Select Institution', institution_options)
 
 # Main title and description
 st.markdown('''  
+# 🌍 Demography
+            
 In the Active Learners Growth Discovery - Capture, the key user metrics include: 
 1. **Overall**: Users test on the Discovery and Capture platforms. 
 2. **Internal User**: Active learners who are Kompas Gramedia Group employees. 
@@ -93,11 +99,11 @@ filtered_df = df_merged[
     (df_merged['last_updated'] <= to_date)
 ]
 
-if selected_platform != 'All':
-    filtered_df = filtered_df[filtered_df['platform'] == selected_platform]
+if selected_platform:
+    filtered_df = filtered_df[filtered_df['platform'].isin(selected_platform)]
 
-if selected_status != 'All':
-    filtered_df = filtered_df[filtered_df['status_learner'] == selected_status]
+if selected_status:
+    filtered_df = filtered_df[filtered_df['status_learner'].isin(selected_status)]
 
 if selected_unit:
     filtered_df = filtered_df[filtered_df['unit'].isin(selected_unit)]
@@ -108,11 +114,14 @@ if selected_layer:
 if selected_title:
     filtered_df = filtered_df[filtered_df['title'].isin(selected_title)]
 
-if selected_company:
-    filtered_df = filtered_df[filtered_df['Company'].isin(selected_company)]
-
 if selected_institution:
     filtered_df = filtered_df[filtered_df['institution'].isin(selected_institution)]
+
+if selected_subunit:
+    filtered_df = filtered_df[filtered_df['subunit'].isin(selected_subunit)]
+
+if selected_years:
+    filtered_df = filtered_df[filtered_df['tenure'].isin(selected_years)]
 
 # Active Users section
 st.header('Active Learners', divider='gray')

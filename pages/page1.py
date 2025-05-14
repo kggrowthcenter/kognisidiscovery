@@ -20,16 +20,31 @@ df_sap, df_merged, df_combined_au_capture, df_creds = finalize_data()
 # Display logo at the top of the sidebar
 st.logo('kognisi_logo.png')
 
-# Add filters to the sidebar
-st.sidebar.header('Filters')
+# Sidebar filters with multiselect
+st.sidebar.header("Filter Options")
 
-# Filter for Platform
-platform_options = ['All'] + df_combined_au_capture['platform'].unique().tolist()
-selected_platform = st.sidebar.selectbox('Select Platform', platform_options)
+# Add platform filter to the sidebar using multiselect with default as empty list
+selected_platform = st.sidebar.multiselect(
+    "Select Platform",
+    options=df_combined_au_capture['platform'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
 
-# Filter for Learner Status
-status_options = ['All'] + df_combined_au_capture['learner_status'].unique().tolist()
-selected_status = st.sidebar.selectbox('Select Status', status_options)
+# Apply platform filter if layers are selected
+if selected_platform:
+    df_combined_au_capture = df_combined_au_capture[df_combined_au_capture['platform'].isin(selected_platform)]
+
+# Add status filter to the sidebar using multiselect with default as empty list
+selected_status = st.sidebar.multiselect(
+    "Select Active/Passive",
+    options=df_combined_au_capture['learner_status'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply status filter if layers are selected
+if selected_status:
+    df_combined_au_capture = df_combined_au_capture[df_combined_au_capture['status_learner'].isin(selected_status)]
+
 
 # Set the main title and description
 st.markdown(''' 
@@ -97,13 +112,14 @@ filtered_df = df_combined_au_capture[
     (df_combined_au_capture['created_at'] <= to_date)
 ]
 
-# Filter tambahan berdasarkan platform
-if selected_platform != 'All':
-    filtered_df = filtered_df[filtered_df['platform'] == selected_platform]
+# Apply platform filter if layers are selected
+if selected_platform:
+    filtered_df = filtered_df[filtered_df['platform'].isin(selected_platform)]
 
-# Filter tambahan berdasarkan status pembelajar
-if selected_status != 'All':
-    filtered_df = filtered_df[filtered_df['learner_status'] == selected_status]
+# Apply status filter if layers are selected
+if selected_status:
+    filtered_df = filtered_df[filtered_df['status_learner'].isin(selected_status)]
+
 
 # Active Users section
 st.header('Active User', divider='gray')

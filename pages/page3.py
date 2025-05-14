@@ -2,573 +2,387 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from data_processing import finalize_data
-from datetime import datetime
 from navigation import make_sidebar
 
 
-# Set the title and favicon in the browser tab
-st.set_page_config(page_title='Result Traits Summary', page_icon='📊')
+# Setting page title and favicon
+st.set_page_config(page_title='Result Summary', page_icon='📊')
 
 make_sidebar()
+
+# Adding logo and header to the sidebar and main page
+st.logo('kognisi_logo.png')
+
+# Main title and description
+st.markdown('''  
+# 📊 Result Summary
+''')
 
 # Retrieve data from data_processing
 df_sap, df_merged, df_combined_au_capture, df_creds = finalize_data()
 
-# Display logo at the top of the sidebar
-st.logo('kognisi_logo.png')
+# Sidebar filters with multiselect
+st.sidebar.header("Filter Options")
 
-# Header with logos
-col1, col2, col3 = st.columns([12, 1, 3])
-with col1:
-    st.markdown("<h2 style='text-align: center;'>📊 Result Traits Summary</h2>", unsafe_allow_html=True)
+df_filtered = df_merged
 
-
-# Sidebar filters
-st.sidebar.header('Filters')
-platform_options = ['All'] + df_merged['platform'].unique().tolist()
-selected_platform = st.sidebar.selectbox('Select Platform', platform_options, index=0)
-
-# Filter the data based on the selected platform for dynamic options
-filtered_platform_df = df_merged if selected_platform == 'All' else df_merged[df_merged['platform'] == selected_platform]
-
-# Sidebar filters
-unit_options = filtered_platform_df['unit'].unique().tolist()
-selected_units = st.sidebar.multiselect('Select Unit', unit_options)
-
-layer_options = filtered_platform_df['layer'].unique().tolist()
-selected_layers = st.sidebar.multiselect('Select Layer', layer_options)
-
-status_options = ['All'] + filtered_platform_df['status_learner'].unique().tolist()
-selected_status = st.sidebar.selectbox('Select Status Learner', status_options)
-
-title_options = filtered_platform_df['title'].unique().tolist()
-selected_titles = st.sidebar.multiselect('Select Title', title_options)
-
-company_options = filtered_platform_df['Company'].unique().tolist()
-selected_company = st.sidebar.multiselect('Select Company', company_options)
-
-# Date filter setup
-min_value, max_value = df_merged['last_updated'].min(), df_merged['last_updated'].max()
-
-# Initialize session state for date filters
-if 'from_date' not in st.session_state:
-    st.session_state.from_date, st.session_state.to_date = min_value, max_value
-
-# Shortcut buttons for date selection
-st.write("**Choose the data period:**")
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button('Lifetime'):
-        st.session_state.from_date, st.session_state.to_date = min_value, max_value
-with col2:
-    if st.button('This Year'):
-        current_year = datetime.now().year
-        st.session_state.from_date, st.session_state.to_date = datetime(current_year, 1, 1).date(), datetime.now().date()
-with col3:
-    if st.button('This Month'):
-        current_year, current_month = datetime.now().year, datetime.now().month
-        st.session_state.from_date, st.session_state.to_date = datetime(current_year, current_month, 1).date(), datetime.now().date()
-
-# Ensure date selections are within valid range
-st.session_state.from_date = max(st.session_state.from_date, min_value)
-st.session_state.to_date = min(st.session_state.to_date, max_value)
-
-# Manual date input
-from_date, to_date = st.date_input(
-    '**Or pick the date manually:**',
-    value=(st.session_state.from_date, st.session_state.to_date),
-    min_value=min_value,
-    max_value=max_value
+# Add platform filter to the sidebar using multiselect with default as empty list
+selected_platform = st.sidebar.multiselect(
+    "Select Platform",
+    options=df_filtered['platform'].unique(),
+    default=[]  # Default is an empty list, no selection initially
 )
 
-# Update session state with manual input
-st.session_state.from_date, st.session_state.to_date = from_date, to_date
+# Apply platform filter if layers are selected
+if selected_platform:
+    df_filtered = df_filtered[df_filtered['platform'].isin(selected_platform)]
 
-# Data filtering based on selected filters
-filtered_df = df_merged[
-    (df_merged['last_updated'] <= to_date) & 
-    (df_merged['last_updated'] >= from_date)
-]
+# Add status filter to the sidebar using multiselect with default as empty list
+selected_status = st.sidebar.multiselect(
+    "Select Internal/External",
+    options=df_filtered['status_learner'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
 
-if selected_platform != 'All':
-    filtered_df = filtered_df[filtered_df['platform'] == selected_platform]
-if selected_status != 'All':
-    filtered_df = filtered_df[filtered_df['status_learner'] == selected_status]
+# Apply status filter if layers are selected
+if selected_status:
+    df_filtered = df_filtered[df_filtered['status_learner'].isin(selected_status)]
+
+# Add unit filter to the sidebar using multiselect with default as empty list
+selected_units = st.sidebar.multiselect(
+    "Select Unit",
+    options=df_filtered['unit'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply unit filter if units are selected
 if selected_units:
-    filtered_df = filtered_df[filtered_df['unit'].isin(selected_units)]
-if selected_layers:
-    filtered_df = filtered_df[filtered_df['layer'].isin(selected_layers)]
-if selected_titles:
-    filtered_df = filtered_df[filtered_df['title'].isin(selected_titles)]
-if selected_company:
-    filtered_df = filtered_df[filtered_df['Company'].isin(selected_company)]
+    df_filtered = df_filtered[df_filtered['unit'].isin(selected_units)]
 
-# Display horizontal stacked bar chart of platform per unit if 'All' is selected for platform
-if selected_platform == 'All':
-    st.write("### Platform Distribution")
+# Add subunit filter to the sidebar using multiselect with default as empty list
+selected_subunits = st.sidebar.multiselect(
+    "Select Subunit",
+    options=df_filtered['subunit'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply subunit filter if subunits are selected
+if selected_subunits:
+    df_filtered = df_filtered[df_filtered['subunit'].isin(selected_subunits)]
+
+# Add layer filter to the sidebar using multiselect with default as empty list
+selected_layers = st.sidebar.multiselect(
+    "Select Layer",
+    options=df_filtered['layer'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply layer filter if layers are selected
+if selected_layers:
+    df_filtered = df_filtered[df_filtered['layer'].isin(selected_layers)]
+
+# Add years (tenure) filter to the sidebar using multiselect with default as empty list
+selected_years = st.sidebar.multiselect(
+    "Select Years (Tenure)",
+    options=df_filtered['tenure'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply tenure filter if years are selected
+if selected_years:
+    df_filtered = df_filtered[df_filtered['tenure'].isin(selected_years)]
+
+# Add institution filter to the sidebar using multiselect with default as empty list
+selected_institution = st.sidebar.multiselect(
+    "Select Institution",
+    options=df_filtered['institution'].unique(),
+    default=[]  # Default is an empty list, no selection initially
+)
+
+# Apply intitution filter if years are selected
+if selected_institution:
+    df_filtered = df_filtered[df_filtered['institution'].isin(selected_institution)]
+
+# Active learners by bundle
+bundle_names = ['GI', 'LEAN', 'ELITE', 'Genuine', 'Astaka']
+
+# Create filtered dataframe for active learners
+df_active_learners = df_filtered.groupby(['Customer ID', 'last_updated', 'title']).size().reset_index(name='test_count')
+
+# Count active learners per bundle
+bundle_counts = {bundle: df_active_learners[df_active_learners['title'] == bundle]['Customer ID'].nunique() for bundle in bundle_names}
+
+# Display active learners counts
+st.header('Active Learners', divider='gray')
+col1, col2, col3, col4, col5 = st.columns(5)
+
+for i, bundle in enumerate(bundle_names):
+    with eval(f'col{i + 1}'):
+        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>{bundle}: <span style='color: red;'>{bundle_counts[bundle]:,}</span></strong></p>", unsafe_allow_html=True)
+
+
+# 1. Get the latest test results for each email and Test Name
+latest_test_results = df_filtered.loc[df_filtered.groupby(['email', 'Test Name'])['last_updated'].idxmax()]
+
+# 2. Count participants based on bundle_name
+participant_counts = df_filtered.groupby('title')['email'].nunique().reset_index()
+participant_counts.columns = ['title', 'jumlah_partisipan']
+
+# 3. Count users based on typology from the latest results
+typology_user_counts = latest_test_results.groupby('typology')['email'].nunique().reset_index()
+typology_user_counts.columns = ['typology', 'jumlah']
+
+# 4. Get unique Test Name for each bundle_name
+test_names = df_filtered[['title', 'Test Name']].drop_duplicates()
+
+# 5. Get all unique typology results for each Test Name
+typology_results = latest_test_results.groupby(['Test Name', 'typology'])['email'].nunique().reset_index()
+typology_results.columns = ['Test Name', 'typology', 'jumlah']
+
+# 6. Calculate percentages for each typology per Test Name
+total_users_per_test = typology_results.groupby('Test Name')['jumlah'].transform('sum')
+typology_results['persentase'] = (typology_results['jumlah'] / total_users_per_test * 100).round(2)
+
+# 7. Combine results into one DataFrame
+result_df = pd.merge(participant_counts, test_names, on='title', how='left')
+result_df = pd.merge(result_df, typology_results, on='Test Name', how='left')
+
+# 8. Add rows for Overall ELITE based on filtered results
+final_results_elite = latest_test_results[latest_test_results['title'] == 'ELITE'].groupby('final_result')['email'].nunique().reset_index()
+overall_elite_rows = [{
+    'title': 'ELITE',
+    'jumlah_partisipan': participant_counts.loc[participant_counts['title'] == 'ELITE', 'jumlah_partisipan'].values[0],
+    'Test Name': 'Overall ELITE',
+    'typology': row['final_result'],
+    'jumlah': row['email'],
+    'persentase': (row['email'] / participant_counts.loc[participant_counts['title'] == 'ELITE', 'jumlah_partisipan'].values[0] * 100).round(2)
+} for _, row in final_results_elite.iterrows()]
+
+overall_elite_df = pd.DataFrame(overall_elite_rows)
+
+# 9. Add rows for Overall LEAN based on filtered results
+final_results_lean = latest_test_results[latest_test_results['title'] == 'LEAN'].groupby('final_result')['email'].nunique().reset_index()
+overall_lean_rows = [{
+    'title': 'LEAN',
+    'jumlah_partisipan': participant_counts.loc[participant_counts['title'] == 'LEAN', 'jumlah_partisipan'].values[0],
+    'Test Name': 'Overall LEAN',
+    'typology': row['final_result'],
+    'jumlah': row['email'],
+    'persentase': (row['email'] / participant_counts.loc[participant_counts['title'] == 'LEAN', 'jumlah_partisipan'].values[0] * 100).round(2)
+} for _, row in final_results_lean.iterrows()]
+
+overall_lean_df = pd.DataFrame(overall_lean_rows)
+
+# 10. Combine result_df with overall_elite_df and overall_lean_df
+result_df = pd.concat([result_df, overall_elite_df, overall_lean_df], ignore_index=True)
+
+# 11. Filter for desired bundles: GI, ELITE, LEAN
+filtered_bundles = ['GI', 'ELITE', 'LEAN']
+result_df = result_df[result_df['title'].isin(filtered_bundles)]
+
+# 12. Set categorical order and sort
+result_df['title'] = pd.Categorical(result_df['title'], categories=filtered_bundles, ordered=True)
+result_df = result_df.sort_values(['title', 'Test Name']).reset_index(drop=True)
+
+# 13. Combine number of users with result_df without additional calculations
+combined_result_df = pd.merge(result_df, typology_user_counts[['typology']], on='typology', how='left')
+
+# 14. Create a custom sort order for 'Test Name'
+def custom_sort_order(test_name):
+    if test_name in ["Mindset", "Overall ELITE", "Overall LEAN"]:
+        return 0
+    return 1
+
+combined_result_df['sort_order'] = combined_result_df['Test Name'].apply(custom_sort_order)
+
+# Sort by bundle_name and custom sort order
+combined_result_df = combined_result_df.sort_values(['title', 'sort_order', 'Test Name']).reset_index(drop=True)
+
+# Typology Summary 
+st.header('Typology Summary', divider='gray')
+
+# Replace bundle filter with dropdown on the main page to show table and chart per test
+
+selected_bundle = st.selectbox(
+    "Choose Bundle",
+    options=["GI", "LEAN", "ELITE", "Genuine", "Astaka"],
+    index=0  # Optional: set the default selected option
+)
+
+# Prepare filtered data based on dropdown selection
+selected_layers_title = ', '.join(selected_layers) if selected_layers else 'All Layers'
+selected_units_title = ', '.join(selected_units) if selected_units else 'All Units'
+
+# --- GI / ELITE / LEAN (Stacked Chart Section) ---
+if selected_bundle in ["GI", "LEAN", "ELITE"]:
+    df_bundle = combined_result_df[combined_result_df['title'] == selected_bundle].copy()
+
+    if selected_bundle == 'LEAN':
+        df_bundle = df_bundle[~df_bundle['typology'].isin(['The Olympian', 'The Spectator'])]
+    elif selected_bundle == 'ELITE':
+        df_bundle = df_bundle[~df_bundle['typology'].isin(['Citizen', 'Governor'])]
+
+    total_users_per_test = df_bundle.groupby('Test Name')['jumlah'].transform('sum')
+    df_bundle['persentase'] = (df_bundle['jumlah'] / total_users_per_test * 100).round(2)
+
+    chart = alt.Chart(df_bundle).mark_bar().encode(
+        x=alt.X('persentase:Q', title='Persentase Active Learners'),
+        y=alt.Y('Test Name:N', title='Test Name', sort='-x'),
+        color=alt.Color('typology:N', title='Typology', scale=alt.Scale(scheme='category10')),
+        tooltip=['Test Name:N', 'jumlah:Q', 'typology:N', 'persentase:Q']
+    ).properties(
+        width=600,
+        height=400
+    ).configure_axis(labelFontSize=12, titleFontSize=14)
+
+    st.altair_chart(chart, use_container_width=True)
+    with st.expander('View Summary Data'):
+        st.dataframe(df_bundle.drop(columns=['sort_order']))
+
+
+# --- Genuine Section ---
+if selected_bundle == "Genuine":
+
+    # Filter for 'Genuine' bundle
+    genuine_filtered = df_filtered[df_filtered['title'] == 'Genuine']
+    highest_scores = genuine_filtered.loc[genuine_filtered.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
+
+    # Prepare the data with necessary columns
+    genuine_active_learners_data = highest_scores[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']].copy()
+
+    # Rank the learners by total_score
+    genuine_active_learners_data['rank'] = genuine_active_learners_data.groupby(['Customer ID', 'last_updated'])['total_score'].rank(ascending=False, method='first').astype(int)
     
-    # Group data to calculate counts and unique emails
-    platform_unit_df = (
-        filtered_df.groupby(['unit', 'platform'])
-        .agg(count=('email', 'size'), Active_Learners=('email', 'nunique'))
+    # Filter out ranks above 9
+    genuine_active_learners_data = genuine_active_learners_data[genuine_active_learners_data['rank'] <= 9]
+
+    # Rank selection dropdown
+    selected_rank = st.selectbox("Select Rank for Genuine", options=range(1, 10), index=0)
+    
+    # Filter data by selected rank
+    filtered_data_by_rank = genuine_active_learners_data[genuine_active_learners_data['rank'] == selected_rank]
+    
+    # Get the latest test results per email
+    latest_results = filtered_data_by_rank.loc[filtered_data_by_rank.groupby('email')['last_updated'].idxmax()]
+    total_participants = latest_results['email'].nunique()
+
+    # Create summary data for display
+    summary_data = (
+        latest_results
+        .groupby(['title', 'Test Name'])  # Group by title and Test Name
+        .agg(
+            jumlah_partisipan=('email', 'nunique'),  # Count unique email
+            jumlah=('email', 'count')  # Count total entries for each Test Name
+        )
         .reset_index()
     )
 
-    # Calculate total counts per unit
-    platform_unit_df['total'] = platform_unit_df.groupby('unit')['count'].transform('sum')
-    platform_unit_df['percent'] = platform_unit_df['count'] / platform_unit_df['total'] * 100
-
-    # Sort units by total count of all platforms
-    sorted_units = (
-        platform_unit_df.groupby('unit')['count']
-        .sum()
-        .sort_values(ascending=False)
-        .index.tolist()
-    )
-
-    # Create the 100% stacked horizontal bar chart with count labels
-    platform_unit_chart = (
-        alt.Chart(platform_unit_df)
-        .mark_bar()
-        .encode(
-            y=alt.Y('unit:N', sort=sorted_units, title='Unit'),
-            x=alt.X('percent:Q', stack="normalize", title='Percentage (%)'),
-            color=alt.Color('platform:N', title='Platform'),
-            tooltip=['platform', 'unit', 'Active_Learners']
-        )
-        .properties(width=600, height=400)
-    )
-
-    # Combine the bar chart and the text labels
-    st.altair_chart(platform_unit_chart, use_container_width=True)
-    
-    # Data download for Growth Inventory
-    with st.expander("Data Distribution Platform"):
-        st.write(platform_unit_df)
-        csv = platform_unit_df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Data", data=csv, file_name="Distribution_Platform.csv", mime="text/csv", help='Click here to download the data as a CSV file')
-
-    
-# Active Users section for Discovery
-if selected_platform == 'Discovery':
-    st.header('Active Learners - Discovery', divider='gray')
-    total_count = filtered_df['email'].nunique()
-    internal_count = filtered_df[filtered_df['status_learner'] == 'Internal']['Customer ID'].nunique()
-    external_count = filtered_df[filtered_df['status_learner'] == 'External']['Customer ID'].nunique()
-
-    # Display metrics columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>Overall: <span style='color: red;'>{total_count:,}</span></strong></p>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>Internal User: <span style='color: red;'>{internal_count:,}</span></strong></p>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>External User: <span style='color: red;'>{external_count:,}</span></strong></p>", unsafe_allow_html=True)
-
-    # Active learners by bundle_name
-    bundle_names = ['GI', 'LEAN', 'ELITE', 'Genuine', 'Astaka']
-    if 'title' in filtered_df.columns:
-        # Group by bundle_name and count unique Customer IDs
-        df_active_learners = filtered_df.groupby(['Customer ID', 'title']).size().reset_index(name='test_count')
-        bundle_counts = {bundle: df_active_learners[df_active_learners['title'] == bundle]['Customer ID'].nunique() for bundle in bundle_names}
-
-        # Display active learners counts
-        st.markdown("<h3>ACTIVE LEARNERS by Bundle</h3>", unsafe_allow_html=True)
-        col1, col2, col3, col4, col5 = st.columns(5)
-        for i, bundle in enumerate(bundle_names):
-            with eval(f'col{i + 1}'):
-                st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>{bundle}: <span style='color: red;'>{bundle_counts.get(bundle, 0):,}</span></strong></p>", unsafe_allow_html=True)
-
-        # Create bar chart for top bundles
-        bundle_chart_data = pd.DataFrame.from_dict(bundle_counts, orient='index', columns=['count']).reset_index()
-        bundle_chart_data.columns = ['Bundle', 'Active Learners']
-
-        # Create the bar chart using Altair
-        # Stacked bar chart for Growth Inventory
-        st.subheader("Top Test Discovery")
-        bundle_bar_chart = (
-            alt.Chart(bundle_chart_data)
-            .mark_bar()
-            .encode(
-                x=alt.X('Active Learners:Q', title='Active Learners Count'),
-                y=alt.Y('Bundle:N', title='Bundle', sort='-x'),
-                color=alt.Color('Bundle:N', title='Bundle'),
-                tooltip=['Bundle:N', 'Active Learners:Q']
-            )
-            .properties(width=600, height=400)
-        )
-
-        # Display the chart
-        st.altair_chart(bundle_bar_chart, use_container_width=True)
-
-        # Data download for Top Test Discovery
-        with st.expander("Top Test Discovery"):
-            st.write(bundle_chart_data)
-            csv = bundle_chart_data.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv, file_name="Top_Test_Discovery.csv", mime="text/csv", help='Click here to download the data as a CSV file')
-
-        
-        # Active learners data for Bundle GI
-        gi_active_learners = filtered_df[filtered_df['title'] == 'GI']
-
-        # Get highest scores
-        highest_scores = gi_active_learners.loc[gi_active_learners.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        gi_active_learners_data = highest_scores[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']]
-
-        # Stacked bar chart for Growth Inventory
-        st.subheader("Growth Inventory")
-        gi_filtered = filtered_df[filtered_df['title'] == 'GI']
-        gi_distribution = gi_filtered.groupby(['Test Name', 'typology']).agg({'Customer ID': 'nunique'}).reset_index()
-        gi_distribution.columns = ['Test Name', 'typology', 'Active Users']
-
-        # Calculate percentages
-        total_active_users_per_test = gi_distribution.groupby('Test Name')['Active Users'].transform('sum')
-        gi_distribution['Percentage'] = (gi_distribution['Active Users'] / total_active_users_per_test * 100).round(2)
-
-        # Plot chart
-        chart = alt.Chart(gi_distribution).mark_bar().encode(
-            x='Test Name',
-            y='Active Users',
-            color='typology',
-            tooltip=[
-                alt.Tooltip('Test Name:N', title='Test Name'),
-                alt.Tooltip('typology:N', title='Typology'),
-                alt.Tooltip('Active Users:Q', title='Active Learners'),
-                alt.Tooltip('Percentage:Q', title='Percentage', format='.1f')  # Format percentage with one decimal place
-            ]
-        ).properties(
-            width=600,
-            height=400
-        ).configure_mark(
-            opacity=0.8
-        ).configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        ).configure_title(
-            fontSize=16
-        )
-
-        st.altair_chart(chart, use_container_width=True)
-
-        # Data download for Growth Inventory
-        with st.expander("Data Growth Inventory"):
-            st.write(gi_distribution)
-            csv = gi_distribution.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv, file_name="Growth_Inventory.csv", mime="text/csv", help='Click here to download the data as a CSV file')
-
-
-        # Repeat for LEAN
-        lean_active_learners = filtered_df[filtered_df['title'] == 'LEAN']
-
-        # Get highest scores for LEAN
-        highest_scores_lean = lean_active_learners.loc[lean_active_learners.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        lean_active_learners_data = highest_scores_lean[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']]
-
-        # Stacked bar chart for LEAN
-        st.subheader("LEAN")
-        lean_filtered = filtered_df[filtered_df['title'] == 'LEAN']
-        lean_distribution = lean_filtered.groupby(['Test Name', 'typology']).agg({'Customer ID': 'nunique'}).reset_index()
-        lean_distribution.columns = ['Test Name', 'typology', 'Active Users']
-
-        # Calculate percentages for LEAN
-        total_active_users_per_test_lean = lean_distribution.groupby('Test Name')['Active Users'].transform('sum')
-        lean_distribution['Percentage'] = (lean_distribution['Active Users'] / total_active_users_per_test_lean * 100).round(2)
-
-        # Plot chart for LEAN
-        chart_lean = alt.Chart(lean_distribution).mark_bar().encode(
-            x='Test Name',
-            y='Active Users',
-            color='typology',
-            tooltip=[
-                alt.Tooltip('Test Name:N', title='Test Name'),
-                alt.Tooltip('typology:N', title='Typology'),
-                alt.Tooltip('Active Users:Q', title='Active Learners'),
-                alt.Tooltip('Percentage:Q', title='Percentage', format='.1f')  # Format percentage with one decimal place
-            ]
-        ).properties(
-            width=600,
-            height=400
-        ).configure_mark(
-            opacity=0.8
-        ).configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        ).configure_title(
-            fontSize=16
-        )
-
-        st.altair_chart(chart_lean, use_container_width=True)
-
-        # Data download for LEAN
-        with st.expander("Data LEAN"):
-            st.write(lean_distribution)
-            csv_lean = lean_distribution.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv_lean, file_name="LEAN.csv", mime="text/csv", help='Click here to download the data as a CSV file')
-
-        # Display final result distribution
-        st.subheader("FINAL RESULT LEAN")
-        lean_active_learners = filtered_df[filtered_df['title'] == 'LEAN']
-
-        # Get highest scores for LEAN
-        highest_scores_lean = lean_active_learners.loc[lean_active_learners.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        lean_active_learners_data = highest_scores_lean[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']]
-        
-        # Get unique combinations of Customer ID and Test Date
-        unique_combinations = lean_active_learners_data[['Customer ID', 'last_updated']].drop_duplicates()
-
-        # Merge back to get final_result
-        unique_results = unique_combinations.merge(lean_active_learners_data[['Customer ID', 'last_updated', 'final_result']],
-                                                   on=['Customer ID', 'last_updated'], 
-                                                   how='left').drop_duplicates()
-
-        # Aggregate final_result for pie chart
-        final_result_counts = unique_results['final_result'].value_counts().reset_index()
-        final_result_counts.columns = ['Final Result', 'Count']
-
-        # Calculate percentage
-        final_result_counts['Percentage'] = (final_result_counts['Count'] / final_result_counts['Count'].sum()) * 100
-
-        # Plot pie chart for final results
-        pie_chart = alt.Chart(final_result_counts).mark_arc().encode(
-            theta='Count:Q',
-            color='Final Result:N',
-            tooltip=[
-                alt.Tooltip('Final Result:N', title='Final Result'),
-                alt.Tooltip('Count:Q', title='Active Learners'),
-                alt.Tooltip('Percentage:Q', title='Percentage', format='.1f')  # Format percentage with one decimal place
-            ]
-        ).properties(
-            width=400,
-            height=400
-        )
-
-        st.altair_chart(pie_chart, use_container_width=True)
-
-        # Expander for final result data
-        with st.expander("View Final Result Data"):
-            st.write(final_result_counts)
-            csv_final = final_result_counts.to_csv(index=False).encode('utf-8')  # Convert to CSV
-            st.download_button(
-                label="Download Final Result Data", 
-                data=csv_final, 
-                file_name="Final_Results_LEAN.csv", 
-                mime="text/csv",
-                help='Click here to download the final result data as a CSV file'
-        )
-
-        # Repeat for ELITE
-        elite_active_learners = filtered_df[filtered_df['title'] == 'ELITE']
-
-        # Get highest scores for ELITE
-        highest_scores_elite = elite_active_learners.loc[elite_active_learners.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        elite_active_learners_data = highest_scores_elite[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']]
-
-        # Stacked bar chart for ELITE
-        st.subheader("ELITE")
-        elite_filtered = filtered_df[filtered_df['title'] == 'ELITE']
-        elite_distribution = elite_filtered.groupby(['Test Name', 'typology']).agg({'Customer ID': 'nunique'}).reset_index()
-        elite_distribution.columns = ['Test Name', 'typology', 'Active Users']
-
-        # Calculate percentages for ELITE
-        total_active_users_per_test_elite = elite_distribution.groupby('Test Name')['Active Users'].transform('sum')
-        elite_distribution['Percentage'] = (elite_distribution['Active Users'] / total_active_users_per_test_elite * 100).round(2)
-
-        # Plot chart for ELITE
-        chart_elite = alt.Chart(elite_distribution).mark_bar().encode(
-            x='Test Name',
-            y='Active Users',
-            color='typology',
-            tooltip=[
-                alt.Tooltip('Test Name:N', title='Test Name'),
-                alt.Tooltip('typology:N', title='Typology'),
-                alt.Tooltip('Active Users:Q', title='Active Learners'),
-                alt.Tooltip('Percentage:Q', title='Percentage', format='.1f')  # Format percentage with one decimal place
-            ]
-        ).properties(
-            width=600,
-            height=400
-        ).configure_mark(
-            opacity=0.8
-        ).configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        ).configure_title(
-            fontSize=16
-        )
-
-        st.altair_chart(chart_elite, use_container_width=True)
-
-        # Data download for ELITE
-        with st.expander("Data ELITE"):
-            st.write(elite_distribution)
-            csv_elite = elite_distribution.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv_elite, file_name="ELITE.csv", mime="text/csv", help='Click here to download the data as a CSV file')
-
-        # Display final result distribution
-        st.subheader("FINAL RESULT ELITE")
-        elite_active_learners = filtered_df[filtered_df['title'] == 'ELITE']
-
-        # Get highest scores for ELITE
-        highest_scores_elite = elite_active_learners.loc[elite_active_learners.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        elite_active_learners_data = highest_scores_elite[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']]
-        
-        # Get unique combinations of Customer ID and Test Date
-        unique_combinations = elite_active_learners_data[['Customer ID', 'last_updated']].drop_duplicates()
-
-        # Merge back to get final_result
-        unique_results = unique_combinations.merge(elite_active_learners_data[['Customer ID', 'last_updated', 'final_result']],
-                                                   on=['Customer ID', 'last_updated'], 
-                                                   how='left').drop_duplicates()
-
-        # Aggregate final_result for pie chart
-        final_result_counts = unique_results['final_result'].value_counts().reset_index()
-        final_result_counts.columns = ['Final Result', 'Count']
-
-        # Calculate percentage
-        final_result_counts['Percentage'] = (final_result_counts['Count'] / final_result_counts['Count'].sum()) * 100
-
-        # Plot pie chart for final results
-        pie_chart = alt.Chart(final_result_counts).mark_arc().encode(
-            theta='Count:Q',
-            color='Final Result:N',
-            tooltip=[
-                alt.Tooltip('Final Result:N', title='Final Result'),
-                alt.Tooltip('Count:Q', title='Active Learners'),
-                alt.Tooltip('Percentage:Q', title='Percentage', format='.1f')  # Format percentage with one decimal place
-            ]
-        ).properties(
-            width=400,
-            height=400
-        )
-
-        st.altair_chart(pie_chart, use_container_width=True)
-
-        # Expander for final result data
-        with st.expander("View Final Result Data"):
-            st.write(final_result_counts)
-            csv_final = final_result_counts.to_csv(index=False).encode('utf-8')  # Convert to CSV
-            st.download_button(
-                label="Download Final Result Data", 
-                data=csv_final, 
-                file_name="Final_Results_ELITE.csv", 
-                mime="text/csv",
-                help='Click here to download the final result data as a CSV file'
-        )
-            
-        st.subheader("Genuine")
-        # Filter DataFrame untuk bundle_name yang spesifik
-        genuine_filtered = filtered_df[filtered_df['title'] == 'Genuine']
-
-        # Get highest scores
-        highest_scores = genuine_filtered.loc[genuine_filtered.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        genuine_active_learners_data = highest_scores[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']].copy()
-
-        # Add a rank column from 1 to 9 based on total_score for each Customer ID and Test Date
-        genuine_active_learners_data['rank'] = genuine_active_learners_data.groupby(['Customer ID', 'last_updated'])['total_score'].rank(ascending=False, method='first').astype(int)
-
-        # Filter ranks from 1 to 9
-        genuine_active_learners_data = genuine_active_learners_data[genuine_active_learners_data['rank'] <= 9]
-
-        # Create a select box for rank selection with a unique key
-        genuine_rank = st.selectbox("Select Top for Genuine", options=list(range(1, 10)), key='genuine_rank_select')
-
-        # Filter data based on the selected rank
-        filtered_rank_data = genuine_active_learners_data[genuine_active_learners_data['rank'] == genuine_rank]
-
-        # Count the number of unique users for each test name at the selected rank
-        user_count_by_test = filtered_rank_data.groupby('Test Name')['Customer ID'].nunique().reset_index()
-        user_count_by_test.columns = ['Test Name', 'Total Active Users']
-
-        # Display the results
-        st.write(f"Genuine Top {genuine_rank}")
-        st.dataframe(user_count_by_test)
-
-        st.subheader("Astaka")
-        # Filter DataFrame untuk bundle_name yang spesifik
-        astaka_filtered = filtered_df[filtered_df['title'] == 'Astaka']
-
-        # Get highest scores
-        highest_scores = astaka_filtered.loc[astaka_filtered.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
-        astaka_active_learners_data = highest_scores[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']].copy()
-
-        # Add a rank column from 1 to 6 based on total_score for each Customer ID and Test Date
-        astaka_active_learners_data['rank'] = astaka_active_learners_data.groupby(['Customer ID', 'last_updated'])['total_score'].rank(ascending=False, method='first').astype(int)
-
-        # Filter ranks from 1 to 6
-        astaka_active_learners_data = astaka_active_learners_data[astaka_active_learners_data['rank'] <= 6]
-
-        # Create a select box for rank selection with a unique key
-        astaka_rank = st.selectbox("Select Top for Astaka", options=list(range(1, 7)), key='astaka_rank_select')
-
-        # Filter data based on the selected rank
-        filtered_rank_data = astaka_active_learners_data[astaka_active_learners_data['rank'] == astaka_rank]
-
-        # Count the number of unique users for each test name at the selected rank
-        user_count_by_test = filtered_rank_data.groupby('Test Name')['Customer ID'].nunique().reset_index()
-        user_count_by_test.columns = ['Test Name', 'Total Active Users']
-
-        # Display the results
-        st.write(f"Astaka Top {astaka_rank}")
-        st.dataframe(user_count_by_test)
-
-if selected_platform == 'Capture':
-    st.header('Active Learners - Capture', divider='gray')
-    total_count = filtered_df['email'].nunique()
-    internal_count = filtered_df[filtered_df['status_learner'] == 'Internal']['email'].nunique()
-    external_count = filtered_df[filtered_df['status_learner'] == 'External']['email'].nunique()
-
-    # Display metrics columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>Overall: <span style='color: red;'>{total_count:,}</span></strong></p>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>Internal User: <span style='color: red;'>{internal_count:,}</span></strong></p>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<p style='font-size: 20px; text-align: center;'><strong>External User: <span style='color: red;'>{external_count:,}</span></strong></p>", unsafe_allow_html=True)
-
-    # Count unique emails per title
-    title_counts = filtered_df.groupby('title')['email'].nunique().reset_index()
-    title_counts.columns = ['title', 'active_learners']
-
-    # Sort the data from highest to lowest
-    title_counts = title_counts.sort_values(by='active_learners', ascending=False)
-
-    # Create the bar chart
-    chart = alt.Chart(title_counts).mark_bar().encode(
-        x=alt.X('active_learners:Q', title='Active Learners'),
-        y=alt.Y('title:O', title='Title', sort=alt.EncodingSortField(field='active_learners', order='descending')),
-        color=alt.Color('title:O', scale=alt.Scale(scheme='category10')),
-        tooltip=['title', 'active_learners']
+    # Add total participants and calculate percentage
+    summary_data['jumlah_partisipan'] = total_participants
+    summary_data['persentase'] = (summary_data['jumlah'] / summary_data['jumlah_partisipan'] * 100).round(2)
+
+    # Reorder columns for display
+    summary_data = summary_data[['title', 'jumlah_partisipan', 'Test Name', 'jumlah', 'persentase']]
+
+
+    # Visualization: Create a bar chart for the data
+    bar_chart = alt.Chart(summary_data).mark_bar().encode(
+        x=alt.X('Test Name:O', title='Test Name'),
+        y=alt.Y('jumlah:Q', title='Jumlah'),
+        tooltip=['Test Name', 'jumlah', 'persentase']
     ).properties(
-        title='Active Learners by Title'
+        title=f'Genuine Top {selected_rank}'
     )
+    # Display the bar chart
+    st.altair_chart(bar_chart, use_container_width=True)
 
-    # Add text layer to display active learners count on top of bars
-    text = chart.mark_text(
-        align='left',
-        baseline='middle',
-        color='black',
-        fontSize=12,
-        fontWeight='bold',
-        dy=-5 # Adjusts the vertical position of the text
-    ).encode(
-        text='active_learners:Q'
-    )
-    
-    # Combine the bar chart and text layer
-    final_chart = chart + text
+    # Display the summary data
+    with st.expander('View Summary Data'):
+        st.dataframe(summary_data)
 
-    # Display the chart
-    st.altair_chart(final_chart, use_container_width=True)
+# --- Astaka Section ---
+if selected_bundle == "Astaka":
 
-    # Data download for Top Test Capture
-    with st.expander("Top Test Capture"):
-        st.write(title_counts)  # Now includes unit information
-        csv = title_counts.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "Download Data", 
-            data=csv, 
-            file_name="Top_Test_Capture.csv", 
-            mime="text/csv", 
-            help='Click here to download the data as a CSV file'
+    astaka_filtered = df_filtered[df_filtered['title'] == 'Astaka']
+    highest_scores = astaka_filtered.loc[astaka_filtered.groupby(['email', 'last_updated', 'Test Name'])['total_score'].idxmax()]
+    astaka_active_learners_data = highest_scores[['name', 'email', 'Customer ID', 'title', 'last_updated', 'Test Name', 'total_score', 'final_result']].copy()
+
+    astaka_active_learners_data['rank'] = astaka_active_learners_data.groupby(['Customer ID', 'last_updated'])['total_score'].rank(ascending=False, method='first').astype(int)
+    astaka_active_learners_data = astaka_active_learners_data[astaka_active_learners_data['rank'] <= 6]
+
+    selected_rank = st.selectbox("Select Rank for Astaka", options=range(1, 7), index=0)
+    filtered_data_by_rank = astaka_active_learners_data[astaka_active_learners_data['rank'] == selected_rank]
+    latest_results = filtered_data_by_rank.loc[filtered_data_by_rank.groupby('email')['last_updated'].idxmax()]
+    total_participants = latest_results['email'].nunique()
+
+    summary_data = (
+        latest_results
+        .groupby(['title', 'Test Name'])
+        .agg(
+            jumlah_partisipan=('email', 'nunique'),
+            jumlah=('email', 'count')
         )
+        .reset_index()
+    )
+    summary_data['jumlah_partisipan'] = total_participants
+    summary_data['persentase'] = (summary_data['jumlah'] / summary_data['jumlah_partisipan'] * 100).round(2)
+    summary_data = summary_data[['title', 'jumlah_partisipan', 'Test Name', 'jumlah', 'persentase']]
+
+    bar_chart = alt.Chart(summary_data).mark_bar().encode(
+        x=alt.X('Test Name:O', title='Test Name'),
+        y=alt.Y('jumlah:Q', title='Jumlah'),
+        tooltip=['Test Name', 'jumlah', 'persentase']
+    ).properties(title=f'Astaka Top {selected_rank}')
+
+    # Display chart & table
+    st.altair_chart(bar_chart, use_container_width=True)
+    with st.expander('View Summary Data'):
+        st.dataframe(summary_data)
+
+# --- Demographic Comparison Section ---
+st.header('Demographic Comparison', divider='gray')
+
+# Step 1: Bundle selection
+selected_demo_bundle = selected_bundle
+
+# Step 2: Filter the latest test results for that bundle
+demo_filtered = latest_test_results[latest_test_results['title'] == selected_demo_bundle]
+
+# Step 3: Get available tests for this bundle
+available_tests = demo_filtered['Test Name'].unique()
+selected_demo_test = st.selectbox("Select Test", options=available_tests)
+
+# Step 4: Choose demographic variable
+demographic_options = ['status_learner', 'unit', 'subunit', 'gender', 'generation', 'layer', 'tenure']
+selected_demo_variable = st.selectbox("Select Demographic Variable", options=demographic_options)
+
+# Step 5: Filter by test
+df_demo = demo_filtered[demo_filtered['Test Name'] == selected_demo_test]
+
+# Step 6: Group and calculate typology distribution
+demo_grouped = (
+    df_demo.groupby([selected_demo_variable, 'typology'])['email']
+    .nunique()
+    .reset_index(name='jumlah')
+)
+
+# Step 7: Calculate total per demographic group
+total_per_group = demo_grouped.groupby(selected_demo_variable)['jumlah'].transform('sum')
+demo_grouped['persentase'] = (demo_grouped['jumlah'] / total_per_group * 100).round(2)
+
+# Step 8: Visualization
+chart = alt.Chart(demo_grouped).mark_bar().encode(
+    x=alt.X('persentase:Q', title='Percentage'),
+    y=alt.Y(f'{selected_demo_variable}:N', title=selected_demo_variable.replace('_', ' ').title()),
+    color=alt.Color('typology:N', title='Typology'),
+    tooltip=[selected_demo_variable, 'typology', 'jumlah', 'persentase']
+).properties(
+    width=700,
+    height=400,
+)
+
+st.altair_chart(chart, use_container_width=True)
+
+# Optional: Show raw data
+with st.expander("View Raw Data Table"):
+    st.dataframe(demo_grouped)

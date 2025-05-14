@@ -91,4 +91,21 @@ def finalize_data():
 
     df_combined_au_capture = fill_empty_with_na(df_combined_au_capture)
 
+    df_merged['subunit'] = df_merged['subunit'].replace(['#N/A', '-'], 'N/A')
+    df_merged['layer'] = df_merged['layer'].replace({
+        'Group 5 Str Layer 1': 'Layer 1',
+        'Group 4 Str Layer 2': 'Layer 2',
+        'Group 3 Str Layer 3B': 'Layer 3',
+        'Group 3 Str Layer 3A': 'Layer 3',
+        'Group 2 Str Layer 4': 'Layer 4',
+        'Group 1 Str Layer 5': 'Layer 5',
+        'Group 1': 'Non Struktural',
+        'Group 2': 'Non Struktural',
+        'Group 3': 'Non Struktural',
+        'Group 4': 'Non Struktural',
+        'Group 5': 'Non Struktural',
+        0: 'N/A'
+    })
+
+
     return df_sap, df_merged, df_combined_au_capture, df_creds
