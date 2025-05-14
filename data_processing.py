@@ -1,168 +1,94 @@
-from fetch_data import fetch_data_creds, fetch_data_discovery
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from fetch_data import fetch_data_discovery_al, fetch_data_discovery_au, fetch_data_sap, fetch_data_capture, fetch_data_creds
 
-def process_astaka(df):
-    # Filter only Astaka bundle
-    df_astaka = df[df["bundle_name"] == "Astaka"].copy()
+@st.cache_data
+def fill_empty_with_na(df, value='N/A'):
+    """Fill empty or None values in the DataFrame with the specified value."""
+    return df.replace(['', None, '#VALUE!'], value).fillna(value)
 
-    # Sort by id, latest taken_date first, highest score first
-    df_astaka = df_astaka.sort_values(by=["id", "taken_date", "total_score"], ascending=[True, False, False])
+@st.cache_data
+def fetch_discovery_al_data():
+    df_discovery_al = fetch_data_discovery_al()
+    df_discovery_al['email'] = df_discovery_al['email'].str.strip().str.lower()
+    return fill_empty_with_na(df_discovery_al)
 
-    # Rank the results per user (Top 1 - Top 6)
-    df_astaka["rank"] = df_astaka.groupby("id").cumcount() + 1
+@st.cache_data
+def fetch_discovery_au_data():
+    df_discovery_au = fetch_data_discovery_au()
+    df_discovery_au['email'] = df_discovery_au['email'].str.strip().str.lower()
+    return fill_empty_with_na(df_discovery_au)
 
-    # Keep only Top 6 results
-    df_astaka = df_astaka[df_astaka["rank"] <= 6]
+@st.cache_data
+def fetch_sap_data():
+    selected_columns = ['name_sap', 'email', 'nik', 'unit', 'subunit', 'admin_hr', 'layer', 'generation', 'gender', 'division', 'department', 'tenure']
+    df_sap = fetch_data_sap(selected_columns)
+    df_sap['email'] = df_sap['email'].str.strip().str.lower()
+    df_sap['nik'] = df_sap['nik'].astype(str).str.zfill(6)
+    return fill_empty_with_na(df_sap)
 
-    # Pivot to have columns like "Astaka_Top 1_Typology", "Astaka_Top 2_Score"
-    df_astaka_pivot = df_astaka.pivot(index=["id", "email", "name", "phone", "register_date"],
-                                      columns="rank",
-                                      values=["typology", "total_score"]).reset_index()
+@st.cache_data
+def fetch_capture_data():
+    df_capture_sheet1, df_capture_sheet2 = fetch_data_capture()
+    df_capture_sheet1['email'] = df_capture_sheet1['email'].str.strip().str.lower()
+    df_capture_sheet2['email'] = df_capture_sheet2['email'].str.strip().str.lower()
+    df_capture_sheet1 = fill_empty_with_na(df_capture_sheet1)
+    df_capture_sheet2 = fill_empty_with_na(df_capture_sheet2)
+    return df_capture_sheet1, df_capture_sheet2
 
-    # Rename columns properly
-    df_astaka_pivot.columns = [
-        f"Astaka_Top {col[1]}_{col[0]}" if isinstance(col, tuple) and col[1] else col[0]
-        for col in df_astaka_pivot.columns
-    ]
-
-    # Process taken date separately (only latest one)
-    df_astaka_date = df_astaka.groupby(["id", "email", "name", "phone", "register_date"])["taken_date"].max().reset_index()
-    df_astaka_date.rename(columns={"taken_date": "Astaka_date"}, inplace=True)
-
-    # Merge both typology + score and latest taken_date
-    df_astaka_final = df_astaka_pivot.merge(df_astaka_date, on=["id", "email", "name", "phone", "register_date"], how="left")
-
-    return df_astaka_final
-
-def process_genuine(df):
-    # Filter only Genuine bundle
-    df_genuine = df[df["bundle_name"] == "Genuine"].copy()
-
-    # Sort by id, latest taken_date first, highest score first
-    df_genuine = df_genuine.sort_values(by=["id", "taken_date", "total_score"], ascending=[True, False, False])
-
-    # Rank the results per user (Top 1 - Top 9)
-    df_genuine["rank"] = df_genuine.groupby("id").cumcount() + 1
-
-    # Keep only Top 9 results
-    df_genuine = df_genuine[df_genuine["rank"] <= 9]
-
-    # Pivot to create columns like "Genuine_Top 1_Typology", "Genuine_Top 2_Score"
-    df_genuine_pivot = df_genuine.pivot(index=["id", "email", "name", "phone", "register_date"],
-                                        columns="rank",
-                                        values=["typology", "total_score"]).reset_index()
-
-    # Rename columns properly
-    df_genuine_pivot.columns = [
-        f"Genuine_Top {col[1]}_{col[0]}" if isinstance(col, tuple) and col[1] else col[0]
-        for col in df_genuine_pivot.columns
-    ]
-
-    # Process taken date separately (only latest one)
-    df_genuine_date = df_genuine.groupby(["id", "email", "name", "phone", "register_date"])["taken_date"].max().reset_index()
-    df_genuine_date.rename(columns={"taken_date": "Genuine_date"}, inplace=True)
-
-    # Merge both typology + score and latest taken_date
-    df_genuine_final = df_genuine_pivot.merge(df_genuine_date, on=["id", "email", "name", "phone", "register_date"], how="left")
-
-    return df_genuine_final
-
-# --- Function to Transform Data ---
-def process_others(df):
-    # Define the bundle names to process
-    bundle_names = ["GI", "LEAN", "ELITE"]
-    df_list = []
-
-    for bundle in bundle_names:
-        # Filter data for the current bundle_name
-        df_bundle = df[df["bundle_name"] == bundle]
-
-        # Pivot final_result separately
-        df_final_result = df_bundle.pivot_table(
-            index=["id", "email", "name", "phone", "register_date"],
-            values="final_result",
-            aggfunc="first"
-        ).reset_index()
-        df_final_result.rename(columns={"final_result": f"{bundle}_overall"}, inplace=True)
-
-        # Pivot typology with test_name for the current bundle
-        df_typology = df_bundle.pivot_table(
-            index=["id", "email", "name", "phone", "register_date"],
-            columns=["test_name"],
-            values="typology",
-            aggfunc="first"
-        )
-
-        # Pivot taken_date for the current bundle (without test_name)
-        df_taken_date = df_bundle.pivot_table(
-            index=["id", "email", "name", "phone", "register_date"],
-            values="taken_date",
-            aggfunc="first"
-        ).reset_index()
-        df_taken_date.rename(columns={"taken_date": f"{bundle}_date"}, inplace=True)
-
-        # Rename typology columns for clarity
-        df_typology.columns = [f"{bundle}_{col}" for col in df_typology.columns]
-        df_typology = df_typology.reset_index()
-
-        # Merge final_result, taken_date, and typology
-        df_bundle_pivot = df_final_result.merge(df_taken_date, on=["id", "email", "name", "phone", "register_date"], how="left")
-        df_bundle_pivot = df_bundle_pivot.merge(df_typology, on=["id", "email", "name", "phone", "register_date"], how="left")
-
-        df_list.append(df_bundle_pivot)
-
-    # Merge all bundle pivots using an outer join
-    if df_list:
-        df_final = df_list[0]
-        for df_bundle_pivot in df_list[1:]:
-            df_final = df_final.merge(df_bundle_pivot, on=["id", "email", "name", "phone", "register_date"], how="outer")
-    else:
-        df_final = pd.DataFrame()  # Handle empty case
-
-    return df_final
-
+@st.cache_data
 def finalize_data():
-    df_creds, df_links = fetch_data_creds()
-    df_discovery = fetch_data_discovery()
+    df_discovery_al = fetch_discovery_al_data()
+    df_discovery_au = fetch_discovery_au_data()
+    df_sap = fetch_sap_data()
+    df_capture_sheet1, df_capture_sheet2 = fetch_capture_data()
+    df_creds = fetch_data_creds()
 
-    # Trim spaces in specific columns
-    df_links["Tipologi"] = df_links["Tipologi"].str.strip()
-    df_discovery["typology"] = df_discovery["typology"].str.strip()
-    df_discovery["final_result"] = df_discovery["final_result"].str.strip()
+    # Pastikan 'gender' tetap ada saat menggabungkan df_discovery_al dan df_capture_sheet1
+    df_capture_sheet1['gender'] = None  # Menambahkan kolom gender ke df_capture_sheet1 dengan nilai default None
+    df_combined_al_capture = pd.concat([df_discovery_al, df_capture_sheet1], ignore_index=True)
 
-    # Load and process the data
-    df_others = process_others(df_discovery)
-    df_astaka = process_astaka(df_discovery)
-    df_genuine = process_genuine(df_discovery)
+    # Drop 'nik' column if it exists
+    if 'nik' in df_combined_al_capture.columns:
+        df_combined_al_capture = df_combined_al_capture.drop(columns=['nik'])
 
-    # Start merging with df_others as the base
-    df_final = df_others.merge(df_astaka, on=["id", "email", "name", "phone", "register_date"], how="left")
-    df_final = df_final.merge(df_genuine, on=["id", "email", "name", "phone", "register_date"], how="left")
+    # Merge with SAP to determine status_learner
+    df_merged = pd.merge(df_combined_al_capture, df_sap, on='email', how='left', indicator=True)
+    df_merged['status_learner'] = df_merged['_merge'].apply(lambda x: 'Internal' if x == 'both' else 'External')
+    df_merged.drop(columns=['_merge'], inplace=True)
 
-    # Define the expected column order
-    column_order = [
-        "id", "email", "name", "phone", "register_date",
-        "GI_date", "GI_overall", "GI_Creativity Style", "GI_Curiosity", "GI_Grit", "GI_Humility",
-        "GI_Meaning Making", "GI_Mindset", "GI_Purpose in Life",
-        "LEAN_date", "LEAN_overall", "LEAN_Cognitive Flexibility", "LEAN_Intellectual Curiosity", "LEAN_Open-Mindedness",
-        "LEAN_Personal Learner", "LEAN_Self-Reflection", "LEAN_Self-Regulation", "LEAN_Social Astuteness",
-        "LEAN_Social Flexibility", "LEAN_Unconventional Thinking",
-        "ELITE_date", "ELITE_overall", "ELITE_Empathy", "ELITE_Motivation", "ELITE_Self-Awareness",
-        "ELITE_Self-Regulation", "ELITE_Social skills",
-        "Astaka_date", "Astaka_Top 1_typology", "Astaka_Top 1_total_score", "Astaka_Top 2_typology",
-        "Astaka_Top 2_total_score", "Astaka_Top 3_typology", "Astaka_Top 3_total_score",
-        "Astaka_Top 4_typology", "Astaka_Top 4_total_score", "Astaka_Top 5_typology",
-        "Astaka_Top 5_total_score", "Astaka_Top 6_typology", "Astaka_Top 6_total_score",
-        "Genuine_date", "Genuine_Top 1_typology", "Genuine_Top 1_total_score", "Genuine_Top 2_typology",
-        "Genuine_Top 2_total_score", "Genuine_Top 3_typology", "Genuine_Top 3_total_score",
-        "Genuine_Top 4_typology", "Genuine_Top 4_total_score", "Genuine_Top 5_typology",
-        "Genuine_Top 5_total_score", "Genuine_Top 6_typology", "Genuine_Top 6_total_score",
-        "Genuine_Top 7_typology", "Genuine_Top 7_total_score", "Genuine_Top 8_typology",
-        "Genuine_Top 8_total_score", "Genuine_Top 9_typology", "Genuine_Top 9_total_score"
-    ]
+    # Convert 'last_updated' to date
+    if 'last_updated' in df_merged.columns:
+        df_merged['last_updated'] = pd.to_datetime(df_merged['last_updated'], errors='coerce').dt.date
 
-    # Reorder columns (keep only the ones that exist in the DataFrame)
-    df_final = df_final[[col for col in column_order if col in df_final.columns]]
+    # Pastikan tidak ada duplikasi kolom gender
+    if 'gender_x' in df_merged.columns and 'gender_y' in df_merged.columns:
+        df_merged['gender'] = df_merged['gender_x'].combine_first(df_merged['gender_y'])
+        df_merged = df_merged.drop(columns=['gender_x', 'gender_y'])
 
-    return df_creds, df_links, df_final
+    # Normalisasi nilai gender menjadi 'female', 'male', atau 'n/a'
+    def normalize_gender(value):
+        value = str(value).strip().lower()  # Pastikan nilai diubah menjadi string lowercase
+        if value in ['male', 'laki-laki', 'laki - laki', 'pria', 'm']:
+            return 'Male'
+        elif value in ['female', 'perempuan', 'wanita', 'f']:
+            return 'Female'
+        else:
+            return 'n/a'
+
+    df_merged['gender'] = df_merged['gender'].apply(normalize_gender)
+
+    # Konversi tipe data 'Customer ID' ke string
+    df_merged['Customer ID'] = df_merged['Customer ID'].astype(str)
+    df_merged = fill_empty_with_na(df_merged)
+
+    # Concatenate Discovery AU and Capture Sheet2 vertically
+    df_combined_au_capture = pd.concat([df_discovery_au, df_capture_sheet2], ignore_index=True)
+
+    # Convert 'created_at' to date
+    if 'created_at' in df_combined_au_capture.columns:
+        df_combined_au_capture['created_at'] = pd.to_datetime(df_combined_au_capture['created_at'], errors='coerce').dt.date
+
+    df_combined_au_capture = fill_empty_with_na(df_combined_au_capture)
+
+    return df_sap, df_merged, df_combined_au_capture, df_creds

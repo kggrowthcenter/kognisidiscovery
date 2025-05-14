@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # Fetch the credentials from the data source
-df_creds, df_links, df_discovery = finalize_data()
+df_sap, df_merged, df_combined_au_capture, df_creds = finalize_data()
 
 # Process `df_creds` to extract credentials in the required format
 def extract_credentials(df_creds):
