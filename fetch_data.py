@@ -62,7 +62,7 @@ def fetch_data_capture():
     client = get_gspread_client("json_sap")
     spreadsheet = client.open("0. Data Capture - Monthly Updated")
 
-    sheet1 = spreadsheet.get_worksheet(0)
+    sheet1 = spreadsheet.get_worksheet(4)
     sheet2 = spreadsheet.get_worksheet(1)
 
     data1 = sheet1.get_all_records()

@@ -107,10 +107,10 @@ if selected_institution:
 bundle_names = ['GI', 'LEAN', 'ELITE', 'Genuine', 'Astaka']
 
 # Create filtered dataframe for active learners
-df_active_learners = df_filtered.groupby(['Customer ID', 'last_updated', 'title']).size().reset_index(name='test_count')
+df_active_learners = df_filtered.groupby(['email', 'last_updated', 'title']).size().reset_index(name='test_count')
 
 # Count active learners per bundle
-bundle_counts = {bundle: df_active_learners[df_active_learners['title'] == bundle]['Customer ID'].nunique() for bundle in bundle_names}
+bundle_counts = {bundle: df_active_learners[df_active_learners['title'] == bundle]['email'].nunique() for bundle in bundle_names}
 
 # Display active learners counts
 st.header('Active Learners', divider='gray')
