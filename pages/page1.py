@@ -43,7 +43,7 @@ selected_status = st.sidebar.multiselect(
 
 # Apply status filter if layers are selected
 if selected_status:
-    df_combined_au_capture = df_combined_au_capture[df_combined_au_capture['status_learner'].isin(selected_status)]
+    df_combined_au_capture = df_combined_au_capture[df_combined_au_capture['learner_status'].isin(selected_status)]
 
 
 # Set the main title and description
@@ -118,7 +118,7 @@ if selected_platform:
 
 # Apply status filter if layers are selected
 if selected_status:
-    filtered_df = filtered_df[filtered_df['status_learner'].isin(selected_status)]
+    filtered_df = filtered_df[filtered_df['learner_status'].isin(selected_status)]
 
 
 # Active Users section
