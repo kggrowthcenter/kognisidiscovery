@@ -5,7 +5,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-@st.cache_resource
+@st.cache_resource(ttl=1800)
 def get_discovery_connection():
     return pymysql.connect(
         host=st.secrets["discovery"]["host"],
@@ -16,7 +16,7 @@ def get_discovery_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_from_query(query_file):
     try:
         conn = get_discovery_connection()
@@ -32,11 +32,11 @@ def fetch_data_from_query(query_file):
         st.error(f"An error occurred while fetching data from {query_file}: {e}")
         return pd.DataFrame()
 
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_discovery_al():
     return fetch_data_from_query('query_DiscoveryAL.sql')
 
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_discovery_au():
     return fetch_data_from_query('query_DiscoveryAU.sql')
 
@@ -44,7 +44,7 @@ def fetch_data_discovery_au():
 # ----------------------------------
 # Cached Google Sheets client
 # ----------------------------------
-@st.cache_resource
+@st.cache_resource(ttl=1800)
 def get_gspread_client(secret_key: str):
     secret_info = st.secrets[secret_key]
     scope = [
@@ -57,7 +57,7 @@ def get_gspread_client(secret_key: str):
 # ----------------------------------
 # Fetch Capture Sheet (2 worksheets)
 # ----------------------------------
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_capture():
     client = get_gspread_client("json_sap")
     spreadsheet = client.open("0. Data Capture - Monthly Updated")
@@ -76,7 +76,7 @@ def fetch_data_capture():
 # ----------------------------------
 # Fetch SAP Sheet with selected columns
 # ----------------------------------
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_sap(selected_columns):
     client = get_gspread_client("json_sap")
     spreadsheet = client.open("0. Active Employee - Monthly Updated")
@@ -89,7 +89,7 @@ def fetch_data_sap(selected_columns):
 # ----------------------------------
 # Fetch Credentials Sheet
 # ----------------------------------
-@st.cache_data
+@st.cache_data(ttl=1800)
 def fetch_data_creds():
     client = get_gspread_client("sheets")
     spreadsheet = client.open("Discovery Test Result - Dashboard Credentials")
