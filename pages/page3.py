@@ -103,6 +103,53 @@ selected_institution = st.sidebar.multiselect(
 if selected_institution:
     df_filtered = df_filtered[df_filtered['institution'].isin(selected_institution)]
 
+
+# Date filter setup
+min_value, max_value = df_filtered['last_updated'].min(), df_filtered['last_updated'].max()
+
+# Initialize session state for date filters
+if 'from_date' not in st.session_state:
+    st.session_state.from_date, st.session_state.to_date = min_value, max_value
+
+# Shortcut buttons for date selection
+st.write("**Choose the data period:**")
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button('Lifetime'):
+        st.session_state.from_date, st.session_state.to_date = min_value, max_value
+with col2:
+    if st.button('This Year'):
+        current_year = datetime.now().year
+        st.session_state.from_date, st.session_state.to_date = datetime(current_year, 1, 1).date(), datetime.now().date()
+with col3:
+    if st.button('This Month'):
+        current_year, current_month = datetime.now().year, datetime.now().month
+        st.session_state.from_date, st.session_state.to_date = datetime(current_year, current_month, 1).date(), datetime.now().date()
+
+# Ensure date selections are within valid range
+st.session_state.from_date = max(st.session_state.from_date, min_value)
+st.session_state.to_date = min(st.session_state.to_date, max_value)
+
+# Manual date input
+from_date, to_date = st.date_input(
+    '**Or pick the date manually:**',
+    value=(st.session_state.from_date, st.session_state.to_date),
+    min_value=min_value,
+    max_value=max_value
+)
+
+# Update session state with manual input
+st.session_state.from_date, st.session_state.to_date = from_date, to_date
+
+# Data filtering based on selected dates and platform
+df_filtered = df_filtered[
+    (df_filtered['last_updated'] >= from_date) & 
+    (df_filtered['last_updated'] <= to_date)
+]
+
+
+
+
 # Active learners by bundle
 bundle_names = ['GI', 'LEAN', 'ELITE', 'Genuine', 'Astaka']
 
