@@ -6,3 +6,4 @@ altair
 streamlit_authenticator
 navigation
 pymysql
+paramiko<3.0
